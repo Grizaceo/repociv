@@ -1057,13 +1057,24 @@ function persistCityCoord(
       repoPath: placed.repoPath,
       repoName: placed.repoName,
       coord: { ...placed.coord },
+      moved: placed.moved,
     };
     prev.placedExisted = true;
-    placeCity({ repoPath: placed.repoPath, repoName: placed.repoName, coord });
+    placeCity({
+      repoPath: placed.repoPath,
+      repoName: placed.repoName,
+      coord,
+      moved: placed.moved,
+    });
     return prev;
   }
 
-  const created = { repoPath: city.repoPath ?? city.id, repoName: city.name, coord: { ...coord } };
+  const created = {
+    repoPath: city.repoPath ?? city.id,
+    repoName: city.name,
+    coord: { ...coord },
+    moved: true,
+  };
   prev.placed = created;
   placeCity(created);
   return prev;
@@ -1174,7 +1185,7 @@ export interface MovedCityPersist {
   /** Manual layout entry the move updated (its stable key) and its old coord. */
   manual: { repoPath: string; coord: Axial } | null;
   /** placedCities entry the move updated or created, with its old coord. */
-  placed: { repoPath: string; repoName: string; coord: Axial } | null;
+  placed: { repoPath: string; repoName: string; coord: Axial; moved?: boolean } | null;
   /** False when the move created the entry (undo removes it). */
   placedExisted: boolean;
   /** Saved terrain override per destination hex, before the move. */
@@ -1398,6 +1409,7 @@ export function undoRemoveCity(world: World, removed: RemovedCity): void {
       repoPath: removed.placedEntry.repoPath,
       repoName: removed.placedEntry.repoName,
       coord: removed.placedEntry.coord,
+      moved: removed.placedEntry.moved,
     });
   }
   if (!removed.wasRemovedKey) restoreCityToMap(cityKey(city));
@@ -1414,6 +1426,7 @@ export function undoFoundCity(world: World, found: FoundedCity): void {
       repoPath: found.prevPlaced.repoPath,
       repoName: found.prevPlaced.repoName,
       coord: found.prevPlaced.coord,
+      moved: found.prevPlaced.moved,
     });
   } else {
     removePlacedCity(key);
@@ -1446,6 +1459,7 @@ function restorePersist(prev: MovedCityPersist | null): void {
         repoPath: prev.placed.repoPath,
         repoName: prev.placed.repoName,
         coord: prev.placed.coord,
+        moved: prev.placed.moved,
       });
     } else {
       removePlacedCity(prev.placed.repoPath);
@@ -1520,6 +1534,8 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
 
   // 4) Cities the user placed by hand (on the map as it looks after step 3).
   for (const entry of placedEntries) {
+    // A moved city is already on the map, or its repo was deselected on purpose.
+    if (entry.moved) continue;
     const repo = findDiskRepoForEntry(diskRepos, entry);
     if (!repo) continue;
     const repoKey = repo.repoPath ?? repo.path;

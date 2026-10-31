@@ -23,6 +23,7 @@ import {
   paintHexOp,
   recalculateAllTerritories,
   relocateCity,
+  removeCityFromWorld,
   removeCityOp,
   undoEraseHex,
   undoFoundCity,
@@ -1083,6 +1084,25 @@ describe('live edits and reload agree', () => {
     const live = fixtureWorld();
     removeCityOp(live, cityIn(live, 'city-b'), RECORD);
     eraseHexOp(live, { q: 5, r: 0 }, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('a repo the editor only moved stays out when it is deselected', () => {
+    const live = fixtureWorld();
+    moveCityOp(live, cityIn(live, 'city-a'), H, RECORD);
+
+    // Deselected: the generator no longer builds it, but it is still on disk.
+    const reloaded = fixtureWorld();
+    removeCityFromWorld(reloaded, 'city-a');
+    applyMapEdits(reloaded, FIXTURE_REPOS);
+    expect(reloaded.cities.some((c) => c.repoPath === '/w/a')).toBe(false);
+  });
+
+  it('a hand-founded city moved later is still founded on reload', () => {
+    const live = fixtureWorld();
+    const founded = foundCityOp(live, FIXTURE_REPOS[2]!, { q: -5, r: 1 }, RECORD)!;
+    moveCityOp(live, founded.city, H, RECORD);
 
     expectReloadMatches(live);
   });

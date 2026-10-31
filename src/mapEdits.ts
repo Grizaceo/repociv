@@ -46,6 +46,11 @@ export interface PlacedCityEntry {
   repoName: string;
   coord: Axial;
   addedAt: number;
+  /**
+   * The editor only moved this city: the entry remembers its hex. Unlike a
+   * hand-founded one, it never creates a city for a repo left out of the map.
+   */
+  moved?: boolean;
 }
 
 export interface MapEditStore {
@@ -215,6 +220,7 @@ export function placeCity(entry: Omit<PlacedCityEntry, 'addedAt'>): void {
   if (existing) {
     existing.coord = entry.coord;
     existing.repoName = entry.repoName;
+    existing.moved = entry.moved;
   } else {
     store.placedCities.push({ ...entry, addedAt: Date.now() });
   }
