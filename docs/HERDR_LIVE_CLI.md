@@ -11,8 +11,8 @@ en `server/herdr_runtime.py`.
   usuario; una copia privada no vería los agentes abiertos en el CLI.
 - Se usa el mismo binario que corre el servidor, porque `observe` va por el
   protocolo interno, que no tiene garantía entre versiones.
-- Nunca se usa `terminal session control`: fija el PTY a su tamaño hasta soltarlo
-  y admite un solo controlador.
+- `observe` no toma el PTY. `terminal session control` solo se usaría de forma
+  limitada: ver «Control limitado».
 - `REPOCIV_HERDR_SOCKET` sustituye el socket. Un `HERDR_SOCKET_PATH` heredado se
   ignora a propósito: si el bridge nace dentro de un panel de una sesión con
   nombre, ese valor apuntaría a otro servidor.
@@ -106,6 +106,23 @@ el umbral exacto: 61 caracteres pasaron, 78 no, y `/zzz…` de 300 sí. Por eso:
 - `terminal.closed` llega al cerrarse el panel, y también en `stdout` con código 0
   si el destino no existe.
 - Un observador huérfano sale con la siguiente salida del panel (EPIPE).
+
+## Control limitado (medido, todavía sin usar)
+
+Medido con un proceso de prueba y con Claude Code real a 72×34:
+
+- `control --cols N --rows M` cambia el PTY: el agente recibe `SIGWINCH` y se redibuja.
+  `pane.layout` no cambia, y `observe` sigue funcionando en paralelo.
+- `pane.send_text` y el teclado de otra terminal siguen llegando durante el control.
+- Al soltar, el PTY vuelve al tamaño actual del layout, aunque otra terminal lo haya
+  cambiado mientras tanto. Con `kill -9` también: tardó medio segundo, así que un
+  bridge caído no deja el PTY atascado.
+- Un segundo controlador recibe `terminal.closed` de inmediato, salvo con `--takeover`,
+  que desplaza al primero.
+- La otra terminal ve el PTY en un recuadro más chico mientras dura el control.
+
+Sin validar: Devin. Un agente que escribe en la pantalla normal podría dejar líneas
+angostas en su historial, impresas mientras el PTY estaba reducido.
 
 ## Ciclo de vida: pendiente para la Fase 3
 
