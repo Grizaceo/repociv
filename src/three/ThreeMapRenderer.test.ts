@@ -83,6 +83,12 @@ describe('computeWorldSignature', () => {
     expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 
+  it('changes when a city moves without changing its terrain or territory size', () => {
+    const a = makeState({ cities: [mkCity('c1', 0, 0)] });
+    const b = makeState({ cities: [mkCity('c1', 3, 0)] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
   it('changes when a unit is added', () => {
     const a = makeState({ units: [] });
     const b = makeState({ units: [mkUnit('u1', 0, 0)] });

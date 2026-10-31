@@ -428,7 +428,9 @@ export function computeWorldSignature(state: GameState): string {
         const color = territoryColorFor(c)
           .map((v) => v.toFixed(3))
           .join(',');
-        return `${c.id}:${c.name}:${c.territory.length}:${tile?.skillHealth ?? ''}:${failed}:${wonders}:${color}`;
+        // A moved city can keep its terrain and territory size: only its
+        // coordinate tells the scene to rebuild.
+        return `${c.id}:${c.name}:${c.coord.q},${c.coord.r}:${c.territory.length}:${tile?.skillHealth ?? ''}:${failed}:${wonders}:${color}`;
       })
       .join('|'),
     units
