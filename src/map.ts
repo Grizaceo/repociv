@@ -1512,8 +1512,8 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   const placedEntries = edits.placedCities.filter((e) => !edits.removedCities.includes(e.repoPath));
   // (a) Move the cities already in the world. Repeat until a full round moves
   // nothing: a city may be waiting for the hex another one is about to leave,
-  // so the entry order must not decide the outcome. A pure swap (A↔B) stays
-  // unsolved and is reported below.
+  // so the entry order must not decide the outcome. generateWorld starts a
+  // swap (A↔B) on its saved hexes; one that still gets here is reported below.
   let pendingMoves = placedEntries.flatMap((entry) => {
     const city = world.cities.find((c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath);
     return city && !axialEquals(city.coord, entry.coord) ? [{ entry, city }] : [];
@@ -1766,6 +1766,13 @@ export async function generateWorld(): Promise<World> {
     if (mapEdits.removedCities.includes(entry.repoPath)) continue;
     placedHexOwners.set(tileKey(entry.coord), entry.repoPath);
   }
+  // A repo with an edit of its own leaves its generated hex in applyMapEdits, so
+  // it can still start on a hex saved for another city. Skipping that hex would
+  // push every later city one slot along, edited or not.
+  const leavingRepos = new Set([
+    ...mapEdits.removedCities,
+    ...mapEdits.placedCities.map((entry) => entry.repoPath),
+  ]);
   let autoCoordCursor = 0;
   for (const repo of cityRepos) {
     if (repo.manualCoord) {
@@ -1783,7 +1790,8 @@ export async function generateWorld(): Promise<World> {
       // city. persistCityCoord saves `city.repoPath ?? city.id`.
       const owner = placedHexOwners.get(key);
       const ownsHex = owner === (repo.repoPath ?? repo.path) || owner === repo.path;
-      if (owner !== undefined && !ownsHex) continue;
+      const leaves = leavingRepos.has(repo.repoPath ?? repo.path) || leavingRepos.has(repo.path);
+      if (owner !== undefined && !ownsHex && !leaves) continue;
 
       // Enforce minimum distance from all previously assigned city coordinates
       let tooClose = false;
@@ -1799,6 +1807,31 @@ export async function generateWorld(): Promise<World> {
       cityCoordLookup.set(repo.path, coord);
       break;
     }
+  }
+
+  // Saved hexes that form a cycle (A on B's hex, B on A's) cannot be replayed
+  // one move at a time: those cities start on their saved hex.
+  const savedHexes = new Map<string, Axial>();
+  for (const repo of cityRepos) {
+    const entry = mapEdits.placedCities.find(
+      (e) => e.repoPath === (repo.repoPath ?? repo.path) || e.repoPath === repo.path,
+    );
+    if (entry && !mapEdits.removedCities.includes(entry.repoPath)) {
+      savedHexes.set(repo.path, entry.coord);
+    }
+  }
+  const generatedOn = new Map(
+    [...cityCoordLookup].map(([path, coord]) => [tileKey(coord), path] as const),
+  );
+  for (const [start, saved] of savedHexes) {
+    const cycle = [start];
+    let next = generatedOn.get(tileKey(saved));
+    while (next && next !== start && savedHexes.has(next) && !cycle.includes(next)) {
+      cycle.push(next);
+      next = generatedOn.get(tileKey(savedHexes.get(next)!));
+    }
+    if (next !== start || cycle.length < 2) continue;
+    for (const path of cycle) cityCoordLookup.set(path, savedHexes.get(path)!);
   }
 
   // Fetch subdirs + skill health + session tint in parallel

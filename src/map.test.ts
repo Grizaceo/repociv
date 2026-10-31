@@ -7,7 +7,8 @@ import {
   relocateCity,
   showMapLoadError,
 } from './map.ts';
-import { placeCity, removeHex, resetMapEditsCache } from './mapEdits.ts';
+import { placeCity, removeCityFromMap, removeHex, resetMapEditsCache } from './mapEdits.ts';
+import { cityKey } from './nations.ts';
 import type { City, District, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -258,6 +259,100 @@ describe('relocateCity', () => {
     const { world, city } = minimalWorldWithCity({ q: 0, r: 0 }, { q: 2, r: 0 });
     const moved = await relocateCity(world, city.id, { q: 0, r: 0 }, city.repoPath ?? null);
     expect(moved).toBeNull();
+  });
+});
+
+describe('generateWorld with hexes saved by the editor', () => {
+  const NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo'];
+
+  beforeEach(() => {
+    const storage: Record<string, string> = {};
+    const localStorageMock = {
+      getItem: (key: string) => storage[key] ?? null,
+      setItem: (key: string, value: string) => {
+        storage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete storage[key];
+      },
+    };
+    vi.stubGlobal('window', { localStorage: localStorageMock });
+    vi.stubGlobal('localStorage', localStorageMock);
+    vi.stubGlobal('document', {
+      getElementById: vi.fn(() => null),
+      createElement: vi.fn(() => ({ id: '', textContent: '', style: {}, setAttribute: vi.fn() })),
+      body: { appendChild: vi.fn() },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return {
+            ok: true,
+            json: async () =>
+              NAMES.map((name) => ({
+                name,
+                path: `/workspace/${name}`,
+                population: 20,
+                extensions: { ts: 10 },
+                gold: 40,
+                lastCommitDays: 1,
+                isLegacy: false,
+                hasGit: true,
+              })),
+          };
+        }
+        if (input === '/api/repo-selections') {
+          const selectedRepoPaths = NAMES.map((name) => `/workspace/${name}`);
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/workspace',
+              roots: [{ path: '/workspace', selectedRepoIds: NAMES, selectedRepoPaths }],
+              selectedRepoIds: NAMES,
+              selectedRepoPaths,
+              hasSelections: true,
+            }),
+          };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+    resetMapEditsCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMapEditsCache();
+  });
+
+  const repoCities = (world: World) => world.cities.filter((c) => !c.isCapital);
+  const coordOf = (world: World, name: string) => world.cities.find((c) => c.name === name)?.coord;
+
+  it('keeps the other cities on their hex when a removed city gives its hex away', async () => {
+    const base = await generateWorld();
+    const [first, second, ...rest] = repoCities(base);
+    removeCityFromMap(cityKey(first!));
+    placeCity({ repoPath: cityKey(second!), repoName: second!.name, coord: first!.coord });
+
+    const world = await generateWorld();
+
+    expect(coordOf(world, first!.name)).toBeUndefined();
+    expect(coordOf(world, second!.name)).toEqual(first!.coord);
+    for (const city of rest) expect(coordOf(world, city.name)).toEqual(city.coord);
+  });
+
+  it('puts two swapped cities back without moving the rest', async () => {
+    const base = await generateWorld();
+    const [first, second, ...rest] = repoCities(base);
+    placeCity({ repoPath: cityKey(first!), repoName: first!.name, coord: second!.coord });
+    placeCity({ repoPath: cityKey(second!), repoName: second!.name, coord: first!.coord });
+
+    const world = await generateWorld();
+
+    expect(coordOf(world, first!.name)).toEqual(second!.coord);
+    expect(coordOf(world, second!.name)).toEqual(first!.coord);
+    for (const city of rest) expect(coordOf(world, city.name)).toEqual(city.coord);
   });
 });
 
