@@ -96,7 +96,7 @@ export default defineConfig(({ mode }) => {
     // Local-only, license-pending Meshy family: served on loopback when opted in, never bundled.
     plugins: [
       accessGatePlugin(tailnetUsers, directBridge ? [env.VITE_BRIDGE_URL as string] : []),
-      repocivPlugin(mapRoot),
+      repocivPlugin(mapRoot, bridgeToken),
       meshyLocalAssets(REPO_ROOT, env.VITE_MESHY_PREVIEW !== '0'),
     ],
     define: directBridge

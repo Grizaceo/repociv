@@ -15,6 +15,7 @@
 
 import type { Plugin, Connect } from 'vite';
 import { execFileSync } from 'node:child_process';
+import { timingSafeEqual } from 'node:crypto';
 import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, basename, dirname, resolve } from 'node:path';
 import { homedir, platform } from 'node:os';
@@ -359,9 +360,41 @@ function respondJson(res: { setHeader: (name: string, value: string) => void; en
   res.end(JSON.stringify(body));
 }
 
+type MutationHeaders = Record<string, string | string[] | undefined>;
+
+function firstHeader(headers: MutationHeaders, name: string): string {
+  const value = headers[name] ?? headers[name.toLowerCase()];
+  return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
+}
+
+function tokenMatches(actual: string, expected: string): boolean {
+  if (!actual || !expected) return false;
+  const actualBytes = Buffer.from(actual);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
+}
+
+export function isTrustedJsonMutation(headers: MutationHeaders, expectedToken: string): boolean {
+  const contentType = firstHeader(headers, 'content-type').split(';', 1)[0]?.trim().toLowerCase();
+  if (contentType !== 'application/json') return false;
+  if (tokenMatches(firstHeader(headers, 'x-repociv-token'), expectedToken)) return true;
+  const host = firstHeader(headers, 'host').trim().toLowerCase();
+  const origin = firstHeader(headers, 'origin').trim();
+  if (!host || !origin) return false;
+  try {
+    const parsed = new URL(origin);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      parsed.host.toLowerCase() === host
+    );
+  } catch {
+    return false;
+  }
+}
+
 // ─── Main plugin factory ──────────────────────────────────────────────────────
 
-export function repocivPlugin(mapRoot: string): Plugin {
+export function repocivPlugin(mapRoot: string, expectedToken = ''): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
   let rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
   saveState(rootsState);
@@ -376,6 +409,24 @@ export function repocivPlugin(mapRoot: string): Plugin {
   const handler: Connect.NextHandleFunction = async (req, res, next) => {
     const rawUrl = req.url ?? '';
     const path = rawUrl.split('?')[0] ?? rawUrl;
+
+    const protectedMutation =
+      req.method === 'POST' && (path === '/event' || path.startsWith('/api/'));
+    if (
+      protectedMutation &&
+      !isTrustedJsonMutation((req.headers ?? {}) as MutationHeaders, expectedToken)
+    ) {
+      const contentType = firstHeader((req.headers ?? {}) as MutationHeaders, 'content-type')
+        .split(';', 1)[0]
+        ?.trim()
+        .toLowerCase();
+      res.statusCode = contentType === 'application/json' ? 403 : 415;
+      respondJson(res, {
+        error:
+          res.statusCode === 415 ? 'application/json required' : 'trusted Origin or token required',
+      });
+      return;
+    }
 
     // Bridge events from bridge.py → frontend HMR websocket
     if (path === '/event' && req.method === 'POST') {

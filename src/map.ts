@@ -570,7 +570,11 @@ export async function pickMapRootFolder(): Promise<{
   root: string;
   totalRepos: number;
 }> {
-  const res = await fetch('/api/map-roots/pick', { method: 'POST' });
+  const res = await fetch('/api/map-roots/pick', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
   if (!res.ok) throw new Error(`/api/map-roots/pick HTTP ${res.status}`);
   return (await res.json()) as { ok: boolean; root: string; totalRepos: number };
 }

@@ -113,7 +113,11 @@ async function fetchCurrentMapRoot(): Promise<string> {
 }
 
 async function pickMapRoot(): Promise<string> {
-  const res = await fetch('/api/map-root/pick', { method: 'POST' });
+  const res = await fetch('/api/map-root/pick', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
   const data = (await res.json()) as { path?: string; error?: string };
   if (!res.ok || !data.path) throw new Error(data.error ?? `HTTP ${res.status}`);
   return data.path;
