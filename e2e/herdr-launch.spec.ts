@@ -9,6 +9,10 @@ async function stage(page: Page, runtime: 'ready' | 'stopped', finalState = 'rea
   const chatRequests: string[] = [];
   let rows: ExternalSessionRow[] = [];
   let ready = false;
+  let updateStatus = (_status: string) => {};
+  let deferAttach = false;
+  let attach = () => {};
+  let disconnect = async () => {};
   await page.addInitScript(() => {
     localStorage.setItem('repociv:tour-seen:v1', '1');
     sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
@@ -41,14 +45,19 @@ async function stage(page: Page, runtime: 'ready' | 'stopped', finalState = 'rea
     } : { state: 'starting', terminalId: '', paneId: '' },
   }));
   await page.routeWebSocket(/\/repociv-ws\/terminal/, (socket) => {
+    updateStatus = (status) => socket.send(JSON.stringify({ type: 'status', status }));
+    disconnect = () => socket.close();
     socket.onMessage((message) => {
       if (typeof message !== 'string') return;
       const data = JSON.parse(message) as Record<string, unknown>;
       wire.push(data);
-      if (data['type'] === 'attach') socket.send(JSON.stringify({
-        type: 'attached', agent: { terminalId: 'term_fixture', paneId: 'w1:p1', agent: 'claude', status: finalState === 'blocked' ? 'blocked' : 'idle', name: 'claude-city', folder: 'city' },
-        cols: 120, rows: 40, history: '',
-      }));
+      if (data['type'] === 'attach') {
+        attach = () => socket.send(JSON.stringify({
+          type: 'attached', agent: { terminalId: 'term_fixture', paneId: 'w1:p1', agent: 'claude', status: finalState === 'blocked' ? 'blocked' : 'idle', name: 'claude-city', folder: 'city' },
+          cols: 120, rows: 40, history: '',
+        }));
+        if (!deferAttach) attach();
+      }
       if (data['type'] === 'submit') socket.send(JSON.stringify({ type: 'submit_result', id: data['id'], state: 'confirmed', reason: null }));
     });
   });
@@ -61,6 +70,10 @@ async function stage(page: Page, runtime: 'ready' | 'stopped', finalState = 'rea
   return {
     dialog, posts: () => posts, body: () => body, wire, chatRequests, finish: () => { ready = true; },
     setRows: (value: ExternalSessionRow[]) => { rows = value; },
+    setStatus: (status: string) => updateStatus(status),
+    pauseAttach: () => { deferAttach = true; },
+    attach: () => attach(),
+    disconnect: () => disconnect(),
   };
 }
 
@@ -85,12 +98,14 @@ test('stopped herdr prevents a launch', async ({ page }) => {
 for (const state of ['ready', 'blocked', 'unknown'] as const) {
   test(`launch ${state} never resubmits the command`, async ({ page }) => {
     const fixture = await stage(page, 'ready', state);
+    if (state === 'unknown') fixture.pauseAttach();
     await fixture.dialog.getByLabel('Agente').selectOption('claude');
     await fixture.dialog.getByLabel('Primer mensaje (opcional)').fill('Hola');
     if (process.env.PHASEB_SHOTS && state === 'ready') await fixture.dialog.screenshot({ path: `${process.env.PHASEB_SHOTS}-wizard.png` });
     await fixture.dialog.locator('.agent-session-submit').click();
     const window = page.locator('#side-panel #agent-window');
     await expect(window).toContainText('Abriendo Claude Code en herdr');
+    await expect(window.locator('.agent-window-send')).toBeDisabled();
     await expect.poll(async () => {
       const panelBox = (await page.locator('#side-panel').boundingBox())!;
       const noticeBox = (await window.locator('.agent-window-notice').boundingBox())!;
@@ -124,11 +139,27 @@ for (const state of ['ready', 'blocked', 'unknown'] as const) {
       await expect(window).toContainText('⌨ Abrir CLI');
       await expect(window.locator('textarea')).toHaveValue('Hola');
       if (process.env.PHASEB_SHOTS) await page.locator('#side-panel').screenshot({ path: `${process.env.PHASEB_SHOTS}-blocked.png` });
+      await expect.poll(() => fixture.wire.some((item) =>
+        item['type'] === 'attach' && item['terminalId'] === 'term_fixture')).toBe(true);
+      await expect(window.locator('.agent-window-send')).toBeDisabled();
+      fixture.setStatus('idle');
+      await expect(window.locator('.agent-window-send')).toBeEnabled();
+      await window.locator('.agent-window-send').click();
+      await expect.poll(() => fixture.wire.filter((item) => item['type'] === 'submit' && item['text'] === 'Hola').length).toBe(1);
+      fixture.pauseAttach();
+      await fixture.disconnect();
+      await expect(window.locator('.agent-window-send')).toBeDisabled();
     } else {
       await expect(window).toContainText('No se pudo confirmar que el agente arrancó.');
+      await expect.poll(() => fixture.wire.some((item) =>
+        item['type'] === 'attach' && item['terminalId'] === 'term_fixture')).toBe(true);
+      await expect(window.locator('.agent-window-send')).toBeDisabled();
+      fixture.attach();
+      await expect(window.locator('.agent-window-send')).toBeEnabled();
     }
     await page.waitForTimeout(1100);
     expect(fixture.posts()).toBe(1);
+    if (state === 'blocked') expect(fixture.wire.filter((item) => item['type'] === 'submit')).toHaveLength(1);
   });
 }
 
@@ -137,6 +168,7 @@ test('waiting for approval does not attach or submit automatically', async ({ pa
   await fixture.dialog.locator('.agent-session-submit').click();
   const window = page.locator('#side-panel #agent-window');
   await expect(window).toContainText('Esperando aprobación en la cola de RepoCiv.');
+  await expect(window.locator('.agent-window-send')).toBeDisabled();
   await page.waitForTimeout(1200);
   expect(fixture.posts()).toBe(1);
   expect(fixture.wire).toHaveLength(0);

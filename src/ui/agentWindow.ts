@@ -66,6 +66,7 @@ let attachDeadline = 0;
 let stopDirectory: (() => void) | null = null;
 let launchState = '';
 let attachUnrecognized = false;
+let connected = false;
 let generation = 0;
 let status = '';
 let notice = '';
@@ -115,8 +116,7 @@ function renderNotice(): void {
   const box = element<HTMLElement>('.agent-window-notice');
   const send = element<HTMLButtonElement>('.agent-window-send');
   if (!box || !send) return;
-  send.disabled = status === 'blocked' || Boolean(BRIDGE_URL) ||
-    Boolean(destination?.launch && launchState !== 'ready');
+  send.disabled = !canSend();
   box.replaceChildren();
   const text = status === 'blocked' ? BLOCKED_NOTICE : notice;
   box.classList.toggle('hidden', !text);
@@ -131,6 +131,11 @@ function renderNotice(): void {
     button.addEventListener('click', cli);
     box.append(' ', button);
   }
+}
+
+function canSend(): boolean {
+  return Boolean(destination && connected && !BRIDGE_URL && status !== 'blocked' &&
+    (!destination.launch || ['ready', 'blocked', 'unknown'].includes(launchState)));
 }
 
 function bubble(text: string, role: 'user' | 'assistant', label: string, detail = ''): HTMLElement {
@@ -240,8 +245,7 @@ function resultReceived(result: SubmitResult): void {
 
 function send(): void {
   const input = element<HTMLTextAreaElement>('.agent-window-input');
-  if (!destination || !input || status === 'blocked' || BRIDGE_URL ||
-    (destination.launch && launchState !== 'ready')) return;
+  if (!input || !canSend()) return;
   const text = input.value;
   if (!text.trim()) return;
   const normalized = normalizeMessage(text);
@@ -252,6 +256,7 @@ function send(): void {
   pending.push(item);
   renderMessages();
   if (!link?.submit(item.id, text)) {
+    connected = false;
     pending = pending.filter((candidate) => candidate !== item);
     notice = 'Sin conexión con el agente: no se envió.';
     renderMessages();
@@ -319,12 +324,15 @@ function connectTerminal(): void {
   const value = destination;
   if (!value?.terminalId || BRIDGE_URL) return;
   link?.stop();
+  connected = false;
+  renderNotice();
   const version = generation;
   if (!attachDeadline) attachDeadline = Date.now() + 30_000;
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   link = new TerminalLink(`${scheme}://${location.host}/repociv-ws/terminal`, value.terminalId, {
     onAttached: (attachment) => {
       if (version !== generation) return;
+      connected = true;
       attachUnrecognized = false;
       if (notice === 'Sin conexión con el agente.' ||
         notice === 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.') {
@@ -337,9 +345,12 @@ function connectTerminal(): void {
     onSize: () => {},
     onScreen: () => {},
     onError: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
-    onClosed: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
+    onClosed: (reason) => {
+      if (version === generation) { connected = false; notice = reasonText(reason); renderNotice(); }
+    },
     onRefused: (reason) => {
       if (version !== generation) return;
+      connected = false;
       if (value.launch && reason === 'not_an_agent_pane') {
         attachUnrecognized = true;
         notice = 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.';
@@ -352,6 +363,7 @@ function connectTerminal(): void {
     },
     onDropped: () => {
       if (version !== generation) return;
+      connected = false;
       for (const item of pending) {
         if (item.state === 'sending') { item.state = 'unconfirmed'; item.reason = 'confirm_unavailable'; }
       }
@@ -505,6 +517,7 @@ export function closeAgentWindow(): void {
   attachDeadline = 0;
   attachUnrecognized = false;
   launchState = '';
+  connected = false;
   timer = 0;
   link?.stop();
   link = null;

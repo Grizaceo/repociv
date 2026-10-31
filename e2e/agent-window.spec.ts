@@ -54,6 +54,7 @@ async function stage(
   await expect(page.locator('#agent-attention-strip')).toBeVisible({ timeout: 60_000 });
   await page.keyboard.press('F8');
   await page.locator('.agents-card[data-session="agent-fixture"]').click();
+  if (!options.noPane) await expect(page.locator('#agent-window .agent-window-send')).toBeEnabled();
   return {
     wire, messages, socket: () => socket!,
     addUser(text: string) {
