@@ -158,17 +158,13 @@ Medido a través del proxy real de Vite: solo conecta el `Origin` propio. Se rec
 un origen ajeno, otro puerto local, `null`, la ausencia de `Origin`, y el origen de
 tailnet aunque esté en `REPOCIV_CORS_ORIGINS`.
 
-### Pendiente antes de la Fase 3: POST entre sitios
+### Resuelto: POST entre sitios
 
-Un POST con `Origin` ajeno y `Content-Type: text/plain` no dispara preflight, y el
-proxy le agrega el token. Medido en un stack aislado: `POST /bridge/directives/record`
-y `POST /api/repos/refresh` respondieron 200. El bridge no valida `Origin` en
-`do_POST`, y eso incluye `/commands`.
+`server/bridge.py` rechaza en `do_POST` un `Origin` ajeno o duplicado con
+`403 origin_not_allowed`, también para las rutas detrás de `/bridge/*`.
+En `vite-plugins/repociv.ts`, `isTrustedJsonMutation` protege los POST a `/event`
+y `/api/*`: exige JSON y un origen coincidente con el host o un token válido.
 
-La solución del tag `archive/audit-rehabilitation-20260712` cubre solo `/event` y
-`/api/*` en `vite-plugins/repociv.ts`: rescatarla no cierra `/bridge/*`. Hace falta
-además rechazar en `do_POST` un `Origin` fuera de la lista.
-
-La terminal no depende de esa capa, por lo que no bloquea la Fase 2. La Fase 3 sí,
-porque lanzará agentes: no debe agregarse ningún POST que escriba en un panel o cree
-uno hasta cerrar esto.
+Antes, en un stack aislado, un POST `text/plain` con origen ajeno a
+`/bridge/directives/record` y `/api/repos/refresh` respondió 200; esa medición
+documentó la brecha ya corregida.

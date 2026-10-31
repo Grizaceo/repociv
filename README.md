@@ -247,6 +247,30 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 
 ---
 
+## Agentes en herdr
+
+Un agente abierto en una terminal común no expone un canal para escribirle, y
+Linux bloquea la inyección de teclas en otra terminal (`TIOCSTI`,
+`dev.tty.legacy_tiocsti=0`). herdr es un multiplexor de terminales para agentes:
+expone cada panel por un socket local, para que RepoCiv vea la pantalla real y
+escriba en el agente sin tomar la terminal. Necesitas herdr **0.9.1 o superior**.
+Si aún no lo tienes, consulta la [instalación oficial de herdr](https://github.com/herdrdev/herdr#install).
+
+Corre `herdr` y abre `claude`, `devin` o `hermes` en un panel. En F8 selecciona
+el agente para abrir su ventana en Crónicas; allí encontrarás «⌨ Abrir CLI».
+Si el agente ya corre en otra terminal, ciérralo y retómalo dentro de herdr.
+
+| Agente | En herdr | Fuera de herdr |
+|--------|----------|----------------|
+| Claude Code | Ventana de agente y CLI en vivo. | Solo lectura; si está inactivo, puedes correr un turno que reanuda la sesión. |
+| Devin | Ventana de agente y CLI en vivo. | Solo lectura; no hay turno de reanudación. |
+| Hermes CLI | Ventana de agente y CLI, enlazadas por su lease. | Chat vivo solo en sesiones de bot/gateway verificadas; si está inactivo, un turno. |
+| Codex | Escritura por `codex queue`; su sesión no se enlaza a un panel de herdr. | Escritura por `codex queue`; si está inactivo, un turno. |
+
+Para más detalle, consulta [docs/HERDR_LIVE_CLI.md](docs/HERDR_LIVE_CLI.md).
+
+---
+
 ## Priority Matrix
 
 Puntúa las misiones locales en cola con `priorityScore(mission, now)` en
